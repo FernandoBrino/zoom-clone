@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import MeetingCard from "./MeetingCard";
 import Loader from "./Loader";
+import { useToast } from "./ui/use-toast";
 
 const CallList = ({ type }: { type: "ended" | "upcoming" | "recordings" }) => {
   const { endedCalls, upcomingCalls, callRecordings, isLoading } =
@@ -15,6 +16,8 @@ const CallList = ({ type }: { type: "ended" | "upcoming" | "recordings" }) => {
   const router = useRouter();
 
   const [recordings, setRecordings] = useState<CallRecording[]>([]);
+
+  const { toast } = useToast();
 
   const getCalls = () => {
     switch (type) {
@@ -43,23 +46,32 @@ const CallList = ({ type }: { type: "ended" | "upcoming" | "recordings" }) => {
   };
 
   useEffect(() => {
-    const fetchRecordings = async() => {
-      const callData = await Promise.all(callRecordings?.map((meeting) => meeting.queryRecordings()) ?? [])
+    const fetchRecordings = async () => {
+      try {
+        const callData = await Promise.all(
+          callRecordings?.map((meeting) => meeting.queryRecordings()) ?? []
+        );
 
-      const recordings = callData.filter(call => call.recordings.length > 0).flatMap(call => call.recordings)
+        const recordings = callData
+          .filter((call) => call.recordings.length > 0)
+          .flatMap((call) => call.recordings);
 
-      setRecordings(recordings)
+        setRecordings(recordings);
+      } catch (error) {
+        toast({ title: "Try again later" });
+        console.log(error);
+      }
+    };
+
+    if (type === "recordings") {
+      fetchRecordings();
     }
-
-    if(type === 'recordings') {
-      fetchRecordings()
-    }
-  }, [type, callRecordings])
+  }, [type, callRecordings]);
 
   const calls = getCalls();
   const noCallsMessage = getNoCallsMessage();
 
-  if(isLoading) return <Loader />
+  if (isLoading) return <Loader />;
 
   return (
     <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
@@ -75,7 +87,8 @@ const CallList = ({ type }: { type: "ended" | "upcoming" | "recordings" }) => {
                 : "/icons/recordings.svg"
             }
             title={
-              (meeting as Call).state?.custom.description.substring(0, 26) || meeting.filename.substring(0, 20) ||
+              (meeting as Call).state?.custom.description.substring(0, 26) ||
+              meeting.filename.substring(0, 20) ||
               "No description"
             }
             date={
